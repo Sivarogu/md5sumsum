@@ -1,12 +1,14 @@
 extern crate walkdir;
 extern crate crypto;
 extern crate rustc_serialize;
+extern crate rayon;
 
 use crypto::md5::Md5;
 use crypto::digest::Digest;
 use std::io::prelude::*;
 use std::fs::File;
 use rustc_serialize::hex::ToHex;
+use rayon::prelude::*;
 
 use std::{env};
 
@@ -21,24 +23,27 @@ fn main() {
             paths.push(String::from(entry.path().to_string_lossy()))
         }
     }
-    // let mut hashcat = String::from("");
-    let mut hashcat_vec: Vec<u8> = Vec::new();
-    for path in paths {
+
+    // Use rayon to hash in parallel
+    paths.par_iter().for_each(|path| {
+        // Open and read the file
         let mut f = File::open(path).unwrap();
         let mut buffer = Vec::new();
         f.read(&mut buffer).unwrap();
 
+        // Hash using MD5
         let mut digest = Md5::new();
         digest.input(&buffer);
         let mut output = [0; 16]; // md5 is 16 bytes long
         digest.result(&mut output);
 
-        hashcat_vec.append(&mut output.to_vec());
-        // hashcat += &output.to_hex();
-    }
+        // Format result to keep Vec<String> type
+        output.to_hex();
+    });
+
+    // Hash joined hashes and print result
     let mut digest = Md5::new();
-    // digest.input(&hashcat.as_bytes());
-    digest.input(&hashcat_vec);
+    digest.input(&paths.join("").as_bytes());
     let mut output = [0; 16];
     digest.result(&mut output);
     print!("{}\n", output.to_hex());
