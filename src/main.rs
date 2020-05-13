@@ -1,5 +1,14 @@
 extern crate walkdir;
-use std::{env, process::Command};
+extern crate crypto;
+extern crate rustc_serialize;
+
+use crypto::md5::Md5;
+use crypto::digest::Digest;
+use std::io::prelude::*;
+use std::fs::File;
+use rustc_serialize::hex::ToHex;
+
+use std::{env};
 
 fn main() {
     let mut paths: Vec<String> = vec![];
@@ -13,15 +22,19 @@ fn main() {
         }
     }
     let mut hashcat = String::from("");
-    for f in paths {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(format!("md5sum \"{}\"", f));
-        let output = String::from_utf8_lossy(&cmd.output().unwrap().stdout).to_string();
-        let vec: Vec<&str> = output.split(" ").collect();
-        hashcat += vec[0];
+    for path in paths {
+        let mut f = File::open(path).unwrap();
+        let mut buffer = Vec::new();
+        f.read(&mut buffer);
+        let mut digest = Md5::new();
+        digest.input(&buffer);
+        let mut output = [0; 16]; // md5 is 16 bytes long
+        digest.result(&mut output);
+        hashcat += &output.to_hex();
     }
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c").arg(format!("echo \"{}\" | md5sum", hashcat));
-    let output = String::from_utf8_lossy(&cmd.output().unwrap().stdout).to_string();
-    print!("{}", output);
+    let mut digest = Md5::new();
+    digest.input(&hashcat.as_bytes());
+    let mut output = [0; 16];
+    digest.result(&mut output);
+    print!("{}\n", output.to_hex());
 }
